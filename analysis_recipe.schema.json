@@ -1,0 +1,212 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Particle Analysis Recipe",
+  "description": "记录一次材料/粉体颗粒图像分析使用的完整参数，包括用户选择、解析后的内部参数、比例尺、运行时策略、统计阈值和复核状态。",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "analysis_mode",
+    "model_source",
+    "user_parameters",
+    "advanced_overrides",
+    "scale",
+    "resolved_parameters",
+    "review"
+  ],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "scale": {
+            "properties": { "has_scale": { "const": true } },
+            "required": ["has_scale"]
+          }
+        },
+        "required": ["scale"]
+      },
+      "then": {
+        "properties": {
+          "resolved_parameters": {
+            "properties": {
+              "statistics": { "required": ["min_diameter_um"] }
+            },
+            "required": ["statistics"]
+          }
+        },
+        "required": ["resolved_parameters"]
+      }
+    }
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1, "maximum": 1, "description": "方案版本 (schema_version)" },
+    "analysis_mode": { "type": "string", "enum": ["standard", "advanced"], "description": "分析模式 (analysis_mode)" },
+    "model_source": {
+      "type": "object",
+      "description": "模型来源 (model_source)：记录本次分析使用的 ONNX 发布包和推理配置。",
+      "required": ["onnx_dir", "flow_inference_config"],
+      "additionalProperties": false,
+      "properties": {
+        "onnx_dir": { "type": "string", "description": "ONNX 模型目录 (onnx_dir)" },
+        "flow_inference_config": { "type": "string", "description": "Flow 推理配置路径 (flow_inference_config)" },
+        "backbone_onnx_sha256": { "type": "string", "description": "backbone.onnx SHA256 哈希" },
+        "neck_head_onnx_sha256": { "type": "string", "description": "neck_head.onnx SHA256 哈希" },
+        "flow_inference_config_sha256": { "type": "string", "description": "flow_inference_config.json SHA256 哈希" },
+        "flow_dynamics_version": { "type": "string", "description": "FlowDynamics 代码版本标识" },
+        "param_search_result_sha256": { "type": "string", "description": "参数搜索结果 JSON SHA256 哈希" }
+      }
+    },
+    "user_parameters": {
+      "type": "object",
+      "description": "用户参数 (user_parameters)：记录用户在界面上直接选择或输入的业务参数。",
+      "required": ["minimum_detectable_diameter", "diameter_unit", "boundary_particle_policy"],
+      "additionalProperties": false,
+      "properties": {
+        "minimum_detectable_diameter": { "type": "number", "exclusiveMinimum": 0, "description": "最小可检粒径 (minimum_detectable_diameter)" },
+        "diameter_unit": { "type": "string", "enum": ["um", "nm", "mm"], "description": "粒径单位 (diameter_unit)" },
+        "boundary_particle_policy": {
+          "type": "string",
+          "enum": ["include", "exclude", "mark_and_exclude_from_psd"],
+          "description": "边界颗粒策略 (boundary_particle_policy)"
+        }
+      }
+    },
+    "advanced_overrides": {
+      "type": "object",
+      "description": "高级覆盖 (advanced_overrides)：记录是否启用高级参数覆盖；标准分析默认 disabled。",
+      "required": ["enabled"],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "description": "是否启用高级覆盖 (enabled)" }
+      }
+    },
+    "scale": {
+      "type": "object",
+      "description": "比例尺 (scale)：记录本次分析的像素到物理单位换算信息。注意：比例尺不属于训练数据 manifest。",
+      "required": ["has_scale"],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": { "has_scale": { "const": true } },
+            "required": ["has_scale"]
+          },
+          "then": { "required": ["pixel_size", "pixel_size_unit", "source"] }
+        }
+      ],
+      "properties": {
+        "has_scale": { "type": "boolean", "description": "是否有比例尺 (has_scale)" },
+        "pixel_size": { "type": "number", "exclusiveMinimum": 0, "description": "像素尺寸 (pixel_size)" },
+        "pixel_size_unit": { "type": "string", "enum": ["um_per_pixel", "nm_per_pixel"], "description": "像素尺寸单位 (pixel_size_unit)" },
+        "source": { "type": "string", "enum": ["manual", "OCR", "microscope_metadata"], "description": "比例尺来源 (source)" }
+      }
+    },
+    "resolved_parameters": {
+      "type": "object",
+      "description": "解析后参数 (resolved_parameters)：记录本次分析真正传入推理、后处理、运行时和统计模块的参数。",
+      "required": ["preprocessing", "flow_dynamics", "runtime", "statistics"],
+      "additionalProperties": false,
+      "properties": {
+        "preprocessing": {
+          "type": "object",
+          "description": "预处理参数 (preprocessing)：图片进入 ONNX 模型前使用的 resize、pad 和归一化约定。",
+          "required": ["input_size", "output_stride", "mean", "std", "pad_value"],
+          "additionalProperties": false,
+          "properties": {
+            "input_size": { "type": "integer", "minimum": 512, "maximum": 4096, "description": "模型输入尺寸 (input_size)，V1 默认 1024" },
+            "output_stride": { "type": "integer", "const": 4, "description": "模型输出步幅 (output_stride)，V1 生产固定为 4。stride 2 为实验分支，使用独立的实验 schema。" },
+            "mean": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3, "description": "归一化均值 (mean)" },
+            "std": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3, "description": "归一化标准差 (std)" },
+            "pad_value": { "type": "integer", "description": "填充值 (pad_value)" }
+          }
+        },
+        "flow_dynamics": {
+          "type": "object",
+          "description": "FlowDynamics 后处理参数 (flow_dynamics)：从 dy/dx/cellprob 生成实例 mask 时使用的参数。",
+          "required": [
+            "euler_cellprob_threshold_logit",
+            "fd_cellprob_threshold",
+            "fd_niter",
+            "fd_min_size",
+            "fd_flow_threshold",
+            "fd_max_size_fraction"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "euler_cellprob_threshold_logit": { "type": "number", "const": 0.0, "description": "Euler 前景门控 logit 阈值 (euler_cellprob_threshold_logit)，固定为 0" },
+            "fd_cellprob_threshold": { "type": "number", "description": "实例级 cellprob 过滤阈值 (fd_cellprob_threshold)" },
+            "fd_niter": { "type": "integer", "minimum": 1, "maximum": 500, "description": "Euler 积分迭代次数 (fd_niter)" },
+            "fd_min_size": { "type": "integer", "minimum": 1, "description": "最小实例像素面积 (fd_min_size), 由 Qt 应用层按公式 fd_min_size ≈ π × (minimum_detectable_diameter / pixel_size / 2)² 从用户输入换算; C++ 仅消费此已换算像素值, 不做单位换算" },
+            "fd_flow_threshold": { "type": "number", "minimum": 0, "maximum": 1, "description": "Flow error 阈值 (fd_flow_threshold)" },
+            "fd_max_size_fraction": { "type": "number", "minimum": 0, "maximum": 1, "description": "最大面积比例 (fd_max_size_fraction)" }
+          }
+        },
+        "runtime": {
+          "type": "object",
+          "description": "运行时参数 (runtime)：大图 tile、边界颗粒策略和跨 tile 去重等软件运行策略。",
+          "required": ["tile_size", "tile_overlap", "tile_core_margin", "edge_touch_margin_px", "boundary_particle_policy", "deduplicate_overlap_masks"],
+          "additionalProperties": false,
+          "properties": {
+            "tile_size": { "type": "integer", "minimum": 512, "description": "切片尺寸 (tile_size)" },
+            "tile_overlap": { "type": "integer", "minimum": 0, "description": "切片重叠 (tile_overlap)" },
+            "tile_core_margin": { "type": "integer", "minimum": 0, "description": "切片核心边距 (tile_core_margin)" },
+            "edge_touch_margin_px": { "type": "integer", "minimum": 0, "description": "边界接触判定边距 (edge_touch_margin_px)" },
+            "boundary_particle_policy": {
+              "type": "string",
+              "enum": ["include", "exclude", "mark_and_exclude_from_psd"],
+              "description": "边界颗粒策略 (boundary_particle_policy)"
+            },
+            "deduplicate_overlap_masks": { "type": "boolean", "const": true, "description": "是否合并重叠切片重复实例 (deduplicate_overlap_masks)。V1 生产始终为 true。" },
+            "ignore_regions": {
+              "type": "array",
+              "description": "主分析 ROI 坐标系内需要忽略的矩形区域 (ignore_regions)。这些区域在模型输出后、FlowDynamics 前后被屏蔽，不属于训练 manifest。",
+              "items": {
+                "type": "object",
+                "required": ["x", "y", "width", "height"],
+                "additionalProperties": false,
+                "properties": {
+                  "x": { "type": "integer", "minimum": 0, "description": "矩形左上角 x，主分析 ROI 坐标。" },
+                  "y": { "type": "integer", "minimum": 0, "description": "矩形左上角 y，主分析 ROI 坐标。" },
+                  "width": { "type": "integer", "minimum": 1, "description": "矩形宽度。" },
+                  "height": { "type": "integer", "minimum": 1, "description": "矩形高度。" }
+                }
+              }
+            }
+          }
+        },
+        "statistics": {
+          "type": "object",
+          "description": "统计参数 (statistics)：粒径统计阶段使用的像素或物理单位阈值。",
+          "required": ["min_diameter_px"],
+          "additionalProperties": false,
+          "properties": {
+            "min_diameter_px": { "type": "number", "description": "最小统计粒径像素值 (min_diameter_px)" },
+            "min_diameter_um": { "type": "number", "description": "最小统计粒径微米值 (min_diameter_um)" }
+          }
+        }
+      }
+    },
+    "review": {
+      "type": "object",
+      "description": "复核状态 (review)：记录本次分析结果是否经过人工复核、是否编辑以及编辑数量。",
+      "required": ["status", "edited", "final_label_source", "edit_counts"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "type": "string", "enum": ["not_reviewed", "reviewed", "edited"], "description": "复核状态 (status)：未复核、已复核或已编辑。" },
+        "edited": { "type": "boolean", "description": "是否被人工编辑 (edited)" },
+        "final_label_source": { "type": "string", "enum": ["auto", "manual", "hybrid"], "description": "最终标签来源 (final_label_source)：自动、人工或混合。" },
+        "edit_counts": {
+          "type": "object",
+          "description": "编辑次数 (edit_counts)：记录删除、新增、拆分、合并操作次数。",
+          "additionalProperties": false,
+          "properties": {
+            "deleted": { "type": "integer", "description": "删除颗粒数量 (deleted)" },
+            "added": { "type": "integer", "description": "新增颗粒数量 (added)" },
+            "split": { "type": "integer", "description": "拆分操作次数 (split)" },
+            "merged": { "type": "integer", "description": "合并操作次数 (merged)" }
+          }
+        }
+      }
+    }
+  }
+}

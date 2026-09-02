@@ -1,0 +1,86 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+env/
+
+# C++ build
+build/
+out/
+Debug/
+Release/
+x64/
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.sln
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+*.cmake
+
+# IDE
+.vs/
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Node / browser tooling
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+playwright-report/
+test-results/
+
+# Model checkpoints, exports, and training outputs
+*.pt
+*.ckpt
+*.onnx
+*.engine
+*.tar.gz
+*.log
+events.out.tfevents*
+runs/
+wandb/
+mlruns/
+lightning_logs/
+outputs/
+predictions/
+results/
+
+# Experiment artifacts (keep best.pth, exclude heavy/large outputs)
+experiments/*/checkpoints/epoch_*.pth
+experiments/*/checkpoints/latest.pth
+experiments/*/onnx/
+experiments/*/alignment_results/
+
+# Local datasets and generated labels/flows
+/data/
+unlabeled/
+cpsam_labels/
+staging_flows/
+
+# Temp / local agent state
+temp/
+.claude/
+.playwright-mcp/
+
+# OS
+.DS_Store
+Thumbs.db
+*.ilk
+*.pdb
+*.exp
+*.lib
+*.dll
